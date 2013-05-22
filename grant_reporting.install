@@ -79,3 +79,16 @@ function grant_reporting_schema()
 
 	return $schema;
 }
+
+/**
+ * Add a field for storing more report info
+ */
+function grant_reporting_update_7100()
+{
+	$spec = array(
+		'type' => 'varchar',
+		'description' => 'Record the name of the affected parties',
+		'length' => 255,
+	);
+	db_add_field( 'grant_report', 'name', $spec );
+}
