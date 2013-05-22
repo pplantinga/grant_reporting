@@ -3,9 +3,17 @@
 function grant_reporting_permission()
 {
 	return array(
+		'administer grant reporting' => array(
+			'title' => t( 'Administer Grant Reporting' ),
+			'description' => t( 'Add grants, add activities' ),
+		),
+		'report grant activity' => array(
+			'title' => t( 'Report Grant Activity' ),
+			'description' => t( 'Report activity that relates to grants' ),
+		),	
 		'access grant reports' => array(
 			'title' => t( 'Access Grant Reports' ),
-			'description' => t( 'Submit and view reports of grants' ),
+			'description' => t( 'View reports of grants' ),
 		)
 	);
 }
@@ -17,7 +25,7 @@ function grant_reporting_menu()
 		'position' => 'right',
 		'page callback' => 'drupal_get_form',
 		'page arguments' => array( 'grant_reporting_config_form' ),
-		'access arguments' => array( 'access grant reports' ),
+		'access arguments' => array( 'administer grant reporting' ),
 	);
 
 	$items['admin/config/grant/reports'] = array(
@@ -25,14 +33,14 @@ function grant_reporting_menu()
 		'description' => 'Configure the grants and activities under those grants',
 		'page callback' => 'drupal_get_form',
 		'page arguments' => array( 'grant_reporting_config_form' ),
-		'access arguments' => array( 'access grant reports' ),
+		'access arguments' => array( 'administer grant reporting' ),
 	);
 
 	$items['grant-report-form'] = array(
 		'title' => 'Grant Report Form',
 		'page callback' => 'drupal_get_form',
 		'page arguments' => array( 'grant_reporting_report_form' ),
-		'access arguments' => array( 'access grant reports' ),
+		'access arguments' => array( 'report grant activity' ),
 	);
 
 	$items['grant-report'] = array(
