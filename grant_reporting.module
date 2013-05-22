@@ -162,6 +162,13 @@ function grant_reporting_report_form()
 		'#title' => 'Select date that this activity occurred',
 	);
 
+	# User enters name of person contacted
+	$form['name'] = array(
+		'#type' => 'textfield',
+		'#title' => 'Enter full name of person contacted',
+		'#maxlength' => 255,
+	);
+
 	$form['submit'] = array(
 		'#type' => 'submit',
 		'#value' => 'Submit'
@@ -187,6 +194,7 @@ function grant_reporting_report_form_submit( $form, &$form_state )
 				'gaid' => intval( $form_state['values']['activity'] ),
 				'uid' => $user->uid,
 				'date' => $date,
+				'name' => $form_state['values']['name'],
 			)
 		)->execute();
 				
