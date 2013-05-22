@@ -1,0 +1,5 @@
+name = Grant Reporting
+description = Collect and pull reports on all our grant activity
+core = 7.x
+dependencies[] = date
+configure = admin/settings/grant-reporting

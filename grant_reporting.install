@@ -1,0 +1,81 @@
+<?php
+
+function grant_reporting_schema()
+{
+	$schema['grants'] = array(
+		'description' => 'A list of our grants',
+		'fields' => array(
+			'gid' => array(
+				'description' => 'grant primary identifier',
+				'type' => 'serial',
+				'unsigned' => TRUE,
+				'not null' => TRUE,
+			),
+			'grant_name' => array(
+				'description' => 'Name of the grant',
+				'type' => 'varchar',
+				'length' => 255,
+				'not null' => TRUE,
+			),
+		),
+		'primary key' => array( 'gid' ),
+	);
+
+	$schema['grant_activities'] = array(
+		'description' => 'A list of activities to be filed under grants',
+		'fields' => array(
+			'gaid' => array(
+				'description' => 'grant activities primary identifier',
+				'type' => 'serial',
+				'unsigned' => TRUE,
+				'not null' => TRUE,
+			),
+			'activity_name' => array(
+				'description' => 'Name of the activity',
+				'type' => 'varchar',
+				'length' => 255,
+				'not null' => TRUE,
+			),
+		),
+		'primary key' => array( 'gaid' ),
+	);
+
+	$schema['grant_report'] = array(
+		'description' => 'Stores all the data for our reports',
+		'fields' => array(
+			'id' => array(
+				'description' => 'Primary Identifier',
+				'type' => 'serial',
+				'unsigned' => TRUE,
+				'not null' => TRUE,
+			),
+			'gid' => array(
+				'description' => 'Grant that this information is for',
+				'type' => 'int',
+				'unsigned' => TRUE,
+				'not null' => TRUE,
+			),
+			'gaid' => array(
+				'description' => 'The activity being recorded',
+				'type' => 'int',
+				'unsigned' => TRUE,
+				'not null' => TRUE,
+			),
+			'uid' => array(
+				'description' => 'User who recorded this activity',
+				'type' => 'int',
+				'unsigned' => TRUE,
+				'not null' => TRUE,
+			),
+			'date' => array(
+				'description' => 'Date that the activity was completed',
+				'type' => 'int',
+				'unsigned' => TRUE,
+				'not null' => TRUE,
+			),
+		),
+		'primary key' => array( 'id' ),
+	);
+
+	return $schema;
+}

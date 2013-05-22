@@ -1,0 +1,394 @@
+<?php
+
+function grant_reporting_permission()
+{
+	return array(
+		'access grant reports' => array(
+			'title' => t( 'Access Grant Reports' ),
+			'description' => t( 'Submit and view reports of grants' ),
+		)
+	);
+}
+
+function grant_reporting_menu()
+{
+	$items['admin/config/grant'] = array(
+		'title' => 'Grant Reporting',
+		'position' => 'right',
+		'page callback' => 'drupal_get_form',
+		'page arguments' => array( 'grant_reporting_config_form' ),
+		'access arguments' => array( 'access grant reports' ),
+	);
+
+	$items['admin/config/grant/reports'] = array(
+		'title' => 'Grant Report Configuration',
+		'description' => 'Configure the grants and activities under those grants',
+		'page callback' => 'drupal_get_form',
+		'page arguments' => array( 'grant_reporting_config_form' ),
+		'access arguments' => array( 'access grant reports' ),
+	);
+
+	$items['grant-report-form'] = array(
+		'title' => 'Grant Report Form',
+		'page callback' => 'drupal_get_form',
+		'page arguments' => array( 'grant_reporting_report_form' ),
+		'access arguments' => array( 'access grant reports' ),
+	);
+
+	$items['grant-report'] = array(
+		'title' => 'Generate Grant Report',
+		'page callback' => 'drupal_get_form',
+		'page arguments' => array( 'grant_reporting_generate_form' ),
+		'access arguments' => array( 'access grant reports' ),
+	);
+
+	$items['grant-report/%/%/%'] = array(
+		'title' => 'Grant Report',
+		'page callback' => 'grant_reporting_report',
+		'page arguments' => array( 1, 2, 3 ),
+		'access arguments' => array( 'access grant reports' ),
+	);
+
+	return $items;
+}
+
+function grant_reporting_config_form()
+{
+	$form = array();
+
+	$form['description'] = array(
+		'#markup' => '<p>This form allows you to add grants and activities</p>',
+	);
+
+	# Grant fieldset
+	$form['grants'] = array(
+		'#type' => 'fieldset',
+		'#title' => t( 'Grants' ),
+	);
+
+	$form['grants']['old_grants'] = array(
+		'#markup' => "<ul><li>"
+			. implode( '</li><li>', create_grant_list() )
+			. "</li></ul>",
+	);
+
+	$form['grants']['new_grant'] = array(
+		'#type' => 'textfield',
+		'#title' => 'Add Grant',
+	);
+	 
+	# Activity fieldset
+	$form['activities'] = array(
+		'#type' => 'fieldset',
+		'#title' => t( 'Activities' ),
+	);
+
+	$form['activities']['old_activities'] = array(
+		'#markup' => "<ul><li>"
+			. implode( '</li><li>', create_activity_list() )
+			. "</li></ul>",
+	);
+
+	$form['activities']['new_activity'] = array(
+		'#type' => 'textfield',
+		'#title' => 'Add Activity',
+	);
+
+	# Submit
+	$form['submit'] = array(
+		'#type' => 'submit',
+		'#value' => 'Submit',
+	);
+
+	return $form;
+}
+
+function grant_reporting_config_form_submit( $form, &$form_state )
+{
+	# Add grant
+	if ( !empty( $form_state['values']['new_grant'] ) )
+	{
+		db_insert( 'grants' )
+			->fields( array( 'grant_name' => $form_state['values']['new_grant'] ) )
+			->execute();
+
+		drupal_set_message( "New grant added!" );
+	}
+
+	# Add activity
+	if ( !empty( $form_state['values']['new_activity'] ) )
+	{
+		db_insert( 'grant_activities' )
+			->fields( array( 'activity_name' => $form_state['values']['new_activity'] ) )
+			->execute();
+
+		drupal_set_message( "New activity added!" );
+	}
+}
+
+function grant_reporting_report_form()
+{
+	$form = array();
+
+	$form['description'] = array(
+		'#markup' => '<p>This form is for reporting activity that falls under a certain grant.</p>',
+	);
+
+	# Gather grant options
+	$form['grant'] = array(
+		'#type' => 'select',
+		'#title' => 'Choose a grant to file this activity under',
+		'#options' => create_grant_list(),
+	);
+
+	# Gather activity options
+	$form['activity'] = array(
+		'#type' => 'select',
+		'#title' => 'Choose an activity to record',
+		'#options' => create_activity_list(),
+	);
+
+	# Allow user to enter time that the activity occurred
+	$form['date'] = array(
+		'#type' => 'date',
+		'#title' => 'Select date that this activity occurred',
+	);
+
+	$form['submit'] = array(
+		'#type' => 'submit',
+		'#value' => 'Submit'
+	);
+
+	return $form;
+}
+
+function grant_reporting_report_form_submit( $form, &$form_state )
+{
+	# Concatenate date values into an int
+	$date = intval(
+		$form_state['values']['date']['year']
+		. str_pad( $form_state['values']['date']['month'], 2, '0', STR_PAD_LEFT )
+		. str_pad( $form_state['values']['date']['day'], 2, '0', STR_PAD_LEFT ) );
+
+	global $user;
+
+	db_insert( 'grant_report' )
+		->fields(
+			array(
+				'gid' => intval( $form_state['values']['grant'] ),
+				'gaid' => intval( $form_state['values']['activity'] ),
+				'uid' => $user->uid,
+				'date' => $date,
+			)
+		)->execute();
+				
+	drupal_set_message( "Report submitted!" );
+}
+
+function grant_reporting_generate_form()
+{
+	$form = array();
+
+	$form['description'] = array(
+		'#markup' => '<p>Enter a grant and a date to generate a report for that month</p>',
+	);
+
+	$form['grant'] = array(
+		'#type' => 'select',
+		'#title' => t( 'Select a grant:' ),
+		'#options' => create_grant_list(),
+		'#required' => TRUE,
+	);
+
+	$form['date'] = array(
+		'#type' => 'date_select',
+		'#title' => t( "Select a date:" ),
+		'#date_year_range' => '2012:+1',
+		'#date_format' => 'Y-M',
+		'#default_value' => date( "Y-M" ),
+		'#required' => TRUE,
+	);
+
+	$form['user'] = array(
+		'#type' => 'select',
+		'#title' => t( "(Optional) Select a user:" ),
+		'#options' => create_user_list(),
+	);
+
+	$form['submit'] = array(
+		'#type' => 'submit',
+		'#value' => 'Generate Report!',
+	);
+
+	return $form;
+}
+
+function grant_reporting_generate_form_submit( $form, &$form_state )
+{
+	$gid = $form_state['values']['grant'];
+	$uid = $form_state['values']['user'];
+	$year = substr( $form_state['values']['date'], 0, 4 );
+	$month = substr( $form_state['values']['date'], -2 );
+
+	$form_state['redirect'] = "grant-report/$gid/$year/$month";
+
+	if ( !empty( $uid ) )
+		$form_state['redirect'] .= "/$uid";
+}
+
+function grant_reporting_report( $gid, $year, $month, $uid = 0 )
+{
+	# Beginning and end of month (technically the number of days)
+	$begin = '00';
+	$end = '99';
+
+	# Find out the title of the grant we're dealing with
+	$grant_title = db_select( 'grants' )
+		->fields( 'grants', array( 'grant_name' ) )
+		->condition( 'gid', $gid )
+		->execute()
+		->fetchField();
+	
+	# Stop date will always be the same
+	$stop = $year . str_pad( $month, 2, '0', STR_PAD_LEFT ) . $end;
+	$end_string = date( "F", mktime( 0, 0, 0, $month, 1 ) ) . ", $year";
+
+	# Set an appropriate title
+	if ( $uid != 0 )
+		drupal_set_title( get_user_name( $uid ) . "'s $grant_title report for $end_string" );
+	else
+		drupal_set_title( "$grant_title report for $end_string" );
+
+	####################
+	# Print month data #
+	####################
+
+	# Start date
+	$start = $year . str_pad( $month, 2, '0', STR_PAD_LEFT ) . $begin;
+
+	# Print header and table
+	$output = "<h3>Month's Report ($end_string):</h3>";
+	$output .= activity_count_table( $gid, $uid, $start, $stop );
+
+	######################
+	# Print quarter data #
+	######################
+
+	# Start info
+	$start_month = ( $month + 9 ) % 12 + 1;
+	$start_year = $year - ( $month < 3 ? 1 : 0 );
+	$start = $start_year . str_pad( $start_month, 2, '0', STR_PAD_LEFT ) . $begin;
+
+	# Human-readable month name + year
+	$start_string = date( "F", mktime( 0, 0, 0, $start_month, 1 ) ) . ", $start_year";
+
+	# Print header and table
+	$output .= "<h3>Quarter's Report ($start_string - $end_string):</h3>";
+	$output .= activity_count_table( $gid, $uid, $start, $stop );
+
+	###################
+	# Print year data #
+	###################
+
+	# Start info
+	$start_year = $year - 1;
+	$start_month = $month % 12 + 1;
+	$start = $start_year . str_pad( $start_month, 2, '0', STR_PAD_LEFT ) . $begin;
+	
+	# Human-readable month name + year
+	$start_string = date( "F", mktime( 0, 0, 0, $start_month, 1 ) ) . ", $start_year";
+
+	# Print header and table
+	$output .= "<h3>Year's Report ($start_string - $end_string):</h3>";
+	$output .= activity_count_table( $gid, $uid, $start, $stop );
+
+	##############
+	# Print Link #
+	##############
+	$output .= "<p>Go back to " . l( 'Report Generator', '/grant-report' ) . ".</p>";
+
+	return $output;
+}
+
+function activity_count_table( $gid, $uid, $start, $stop )
+{
+	$activities = create_activity_list();
+	
+	$rows = array();
+	
+	foreach ( $activities as $gaid => $activity )
+		$rows[] = array( $activity, count_activities( $gid, $gaid, $uid, $start, $stop ) );
+	
+	return theme(
+		'table',
+		array(
+			'header' => array( 'Activity', 'Count' ),
+			'rows' => $rows,
+		)
+	);
+}
+
+function count_activities( $gid, $gaid, $uid, $start, $end )
+{
+	$activity_count = db_select( 'grant_report' )
+		->condition( 'gid', $gid )
+		->condition( 'gaid', $gaid )
+		->condition( 'date', $start, '>' )
+		->condition( 'date', $end, '<' );
+
+	if ( !empty( $uid ) )
+		$activity_count = $activity_count->condition( 'uid', $uid );
+
+	return $activity_count->countQuery()->execute()->fetchField();
+}
+
+function create_grant_list()
+{
+	$grants_result = db_select( 'grants' )
+		->fields( 'grants', array( 'gid', 'grant_name' ) )
+		->execute();
+
+	$grants = array();
+	while ( $grant = $grants_result->fetchAssoc() )
+		$grants[$grant['gid']] = $grant['grant_name'];
+
+	return $grants;
+}
+
+function create_activity_list()
+{
+	$activities_result = db_select( 'grant_activities' )
+		->fields( 'grant_activities', array( 'gaid', 'activity_name' ) )
+		->execute();
+
+	$activities = array();
+	while ( $activity = $activities_result->fetchAssoc() )
+		$activities[$activity['gaid']] = $activity['activity_name'];
+
+	return $activities;
+}
+
+function create_user_list()
+{
+	$user_result = db_select( 'grant_report' )
+		->fields( 'grant_report', array( 'uid' ) )
+		->distinct()
+		->execute();
+
+	$users = array( '' );
+	while ( $uid = $user_result->fetchField() )
+		$users[$uid] = get_user_name( $uid ); 
+
+	return $users;
+}
+
+function get_user_name( $uid )
+{
+	$name = db_select( 'users' )
+		->fields( 'users', array( 'name' ) )
+		->condition( 'uid', $uid )
+		->execute()
+		->fetchField();
+
+	return $name;
+}
