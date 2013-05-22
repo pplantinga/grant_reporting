@@ -57,6 +57,20 @@ function grant_reporting_menu()
 		'access arguments' => array( 'access grant reports' ),
 	);
 
+	$items['grant-report-detail'] = array(
+		'title' => 'Generate Detailed Grant Report',
+		'page callback' => 'drupal_get_form',
+		'page arguments' => array( 'grant_reporting_generate_detail_form' ),
+		'access arguments' => array( 'access grant reports' ),
+	);
+
+	$items['grant-report-detail/%/%/%'] = array(
+		'title' => 'Detailed Grant Report',
+		'page callback' => 'grant_reporting_detail',
+		'page arguments' => array( 1, 2, 3 ),
+		'access arguments' => array( 'access grant reports' ),
+	);
+
 	return $items;
 }
 
@@ -259,11 +273,7 @@ function grant_reporting_report( $gid, $year, $month, $uid = 0 )
 	$end = '99';
 
 	# Find out the title of the grant we're dealing with
-	$grant_title = db_select( 'grants' )
-		->fields( 'grants', array( 'grant_name' ) )
-		->condition( 'gid', $gid )
-		->execute()
-		->fetchField();
+	$grant_name = get_grant_name( $gid );
 	
 	# Stop date will always be the same
 	$stop = $year . str_pad( $month, 2, '0', STR_PAD_LEFT ) . $end;
@@ -271,9 +281,9 @@ function grant_reporting_report( $gid, $year, $month, $uid = 0 )
 
 	# Set an appropriate title
 	if ( $uid != 0 )
-		drupal_set_title( get_user_name( $uid ) . "'s $grant_title report for $end_string" );
+		drupal_set_title( get_user_name( $uid ) . "'s $grant_name report for $end_string" );
 	else
-		drupal_set_title( "$grant_title report for $end_string" );
+		drupal_set_title( "$grant_name report for $end_string" );
 
 	####################
 	# Print month data #
@@ -296,7 +306,7 @@ function grant_reporting_report( $gid, $year, $month, $uid = 0 )
 	$start = $start_year . str_pad( $start_month, 2, '0', STR_PAD_LEFT ) . $begin;
 
 	# Human-readable month name + year
-	$start_string = date( "F", mktime( 0, 0, 0, $start_month, 1 ) ) . ", $start_year";
+	$start_string = get_date_string( $start_year, $start_month );
 
 	# Print header and table
 	$output .= "<h3>Quarter's Report ($start_string - $end_string):</h3>";
@@ -312,7 +322,7 @@ function grant_reporting_report( $gid, $year, $month, $uid = 0 )
 	$start = $start_year . str_pad( $start_month, 2, '0', STR_PAD_LEFT ) . $begin;
 	
 	# Human-readable month name + year
-	$start_string = date( "F", mktime( 0, 0, 0, $start_month, 1 ) ) . ", $start_year";
+	$start_string = get_date_string( $start_year, $start_month );
 
 	# Print header and table
 	$output .= "<h3>Year's Report ($start_string - $end_string):</h3>";
@@ -324,6 +334,148 @@ function grant_reporting_report( $gid, $year, $month, $uid = 0 )
 	$output .= "<p>Go back to " . l( 'Report Generator', '/grant-report' ) . ".</p>";
 
 	return $output;
+}
+
+function grant_reporting_generate_detail_form()
+{
+	$form = array();
+
+	$form['description'] = array(
+		'#markup' => '<p>Enter a grant and a start and end date to generate a detailed report for that month</p>',
+	);
+
+	$form['grant'] = array(
+		'#type' => 'select',
+		'#title' => t( 'Select a grant:' ),
+		'#options' => create_grant_list(),
+		'#required' => TRUE,
+	);
+
+	// Start date default is one year ago
+	$form['begin'] = array(
+		'#type' => 'date_select',
+		'#title' => t( 'Select a start date:' ),
+		'#date_year_range' => '2012:+0',
+		'#date_format' => 'Y-M',
+		'#default_value' => date( 'Y-M', time() - 31557600 ),
+		'#required' => TRUE,
+	);
+
+	// End date default is now
+	$form['end'] = array(
+		'#type' => 'date_select',
+		'#title' => t( 'Select an end date:' ),
+		'#date_year_range' => '2012:+0',
+		'#date_format' => 'Y-M',
+		'#default_value' => date( 'Y-M' ),
+		'#required' => TRUE,
+	);
+
+	$form['user'] = array(
+		'#type' => 'select',
+		'#title' => t( "(Optional) Select a user:" ),
+		'#options' => create_user_list(),
+	);
+
+	$form['submit'] = array(
+		'#type' => 'submit',
+		'#value' => 'Generate Detailed Report!',
+	);
+
+	return $form;
+}
+
+function grant_reporting_generate_detail_form_submit( $form, &$form_state )
+{
+	$gid = $form_state['values']['grant'];
+	$begin = $form_state['values']['begin'];
+	$end = $form_state['values']['end'];
+	$uid = $form_state['values']['user'];
+
+	$form_state['redirect'] = "grant-report-detail/$gid/$begin/$end";
+
+	if ( !empty( $uid ) )
+		$form_state['redirect'] .= "/$uid";
+}
+
+function grant_reporting_detail( $gid, $begin, $end, $uid = 0 )
+{
+	$output = '';
+
+	$grant_name = get_grant_name( $gid );
+
+	// Format dates
+	$begin = str_replace( '-', '', $begin );
+	$end = str_replace( '-', '', $end );
+	$begin_date = get_date_string( parse_year( $begin ), parse_month( $begin ) );
+	$end_date = get_date_string( parse_year( $end ), parse_month( $end ) );
+
+	$output .= '<p>';
+	if ( $uid )
+		$output .= get_user_name( $uid ) . "'s ";
+	
+	$output .= "Activity on the $grant_name grant from $begin_date to $end_date.</p>";
+
+	$output .= activity_detail_table( $gid, $uid, $begin, $end );
+	
+	return $output;
+}
+
+function parse_year( $date ) { return intval( substr( $date, 0, 4 ) ); }
+function parse_month( $date ) { return intval( substr( $date, 4, 2 ) ); }
+function parse_day( $date ) { return intval( substr( $date, 6, 2 ) ); }
+
+function get_date_string( $year, $month, $day = 0 )
+{
+	if ( $day )
+		$date_string = date( "F j, Y", mktime( 0, 0, 0, $month, $day, $year ) );
+	else
+		$date_string = date( "F, Y", mktime( 0, 0, 0, $month, 1, $year ) );
+
+	return $date_string;
+}
+
+function activity_detail_table( $gid, $uid, $begin, $end )
+{
+	$activity_query = db_select( 'grant_report', 'gr' );
+	$activity_query->join( 'grant_activities', 'ga', 'gr.gaid = ga.gaid' );
+	$activity_query->join( 'users', 'u', 'gr.uid = u.uid' );
+
+	$activity_query->fields( 'gr', array( 'name', 'date' ) )
+		->fields( 'ga', array( 'activity_name' ) )
+		->addField( 'u', 'name', 'username' );
+	
+	$activity_query->condition( 'gid', $gid )
+		->condition( 'date', $begin . '00', '>' )
+		->condition( 'date', $end . '99', '<' );
+
+	if ( $uid )
+		$activity_query->condition( 'uid', $uid );
+
+	$activity_query->orderBy( 'date', 'DESC' );
+	$activities = $activity_query->execute();
+
+	$rows = array();
+	while ( $activity = $activities->fetchAssoc() )
+	{
+		$year = parse_year( $activity['date'] );
+		$month = parse_month( $activity['date'] );
+		$day = parse_day( $activity['date'] );
+		$rows[] = array(
+			$activity['name'],
+			$activity['username'],
+			$activity['activity_name'],
+			get_date_string( $year, $month, $day ),
+		);
+	}
+
+	return theme(
+		'table',
+		array(
+			'header' => array( 'Person helped', 'Advocate', 'Activity', 'Date' ),
+			'rows' => $rows,
+		)
+	);
 }
 
 function activity_count_table( $gid, $uid, $start, $stop )
@@ -406,5 +558,16 @@ function get_user_name( $uid )
 		->execute()
 		->fetchField();
 
+	return $name;
+}
+
+function get_grant_name( $gid )
+{
+	$name = db_select( 'grants' )
+		->fields( 'grants', array( 'grant_name' ) )
+		->condition( 'gid', $gid )
+		->execute()
+		->fetchField();
+	
 	return $name;
 }
