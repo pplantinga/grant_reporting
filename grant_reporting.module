@@ -450,7 +450,7 @@ function activity_detail_table( $gid, $uid, $begin, $end )
 		->condition( 'date', $end . '99', '<' );
 
 	if ( $uid )
-		$activity_query->condition( 'uid', $uid );
+		$activity_query->condition( 'gr.uid', $uid );
 
 	$activity_query->orderBy( 'date', 'DESC' );
 	$activities = $activity_query->execute();
